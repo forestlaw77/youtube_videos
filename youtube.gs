@@ -5,10 +5,13 @@
  */
 
 /*
- * Convert Japan Time
+ * Format date in user timezone
  */
-function dateJST(timestamp) {
-  return Utilities.formatDate(new Date(timestamp), 'JST', 'yyyy/MM/dd HH:mm:ss');
+function formatDateInUserTimeZone(timestamp) {
+  const userTimeZone = Session.getScriptTimeZone();
+  const format = "yyyy/MM/dd HH:mm:ss";
+  const dateFormat = Utilities.formatDate(new Date(timestamp), userTimeZone, format);
+  return dateFormat;
 }
 
 /*
@@ -23,27 +26,49 @@ function onOpen() {
 }
 
 /*
- * Get All Videos 
+ * Get All Video Infomation
  */
-function getAllVideos(channelId) {
+function getAllVideoInfo (channelId) {
   let videos = [];
   let nextPageToken = "";
 
   do {
-    let response = [];
+    let searchResponse = [];
+    let videoResponse = [];
+    
     try {
-      response = YouTube.Search.list("id, snippet", {
-        channelId,
+      searchResponse = YouTube.Search.list("id", {
+        channelId: channelId,
         type: "video",
         maxResults: 50,
         pageToken: nextPageToken,
       });
     } catch (error) {
-      console.error("Error fetching videos: ", error);
-      break;
+      console.error("Error fetching video: ", error);
+      continue;
     }
-    videos = videos.concat(response.items);
-    nextPageToken = response.nextPageToken;
+
+    const videoIds = searchResponse.items.map(item => item.id.videoId).join(",");
+
+    try {
+      videoResponse = YouTube.Videos.list("snippet, contentDetails, statistics", {
+        id: videoIds,
+      });
+    } catch (error) {
+      console.error("Error fetching video Info: ", error);
+      continue;
+    }
+
+    for (let cnt = 0; cnt < searchResponse.items.length; cnt++) {
+      const video = searchResponse.items[cnt];
+      const videoInfo = videoResponse.items[cnt];
+      videos.push({
+        id: video.id,
+        info: videoInfo,
+      });
+    }
+
+    nextPageToken = searchResponse.nextPageToken;
   } while (nextPageToken);
 
   return videos;
@@ -62,6 +87,7 @@ function getChannelId(handleId) {
     });
   } catch (error) {
     console.error("Error fetching channelId: ", error);
+    return null;
   }
   const channelId = response.items[0].id.channelId;
   return channelId;
@@ -73,7 +99,7 @@ function getChannelId(handleId) {
 function getHandleId(sheet) {
   const handleId = sheet.getSheetName();
   if (!handleId.match(/^@.*/)) { // Is valid handle ID?
-    throw new Error("No Handle ID found. Please set handle ID to sheet name.");
+    return null;
   }
   return handleId;
 }
@@ -97,15 +123,15 @@ function writeFooter(sheet) {
 }
 
 /*
- * Write the videos to a spreadsheet
+ * Write the video info to the spreadsheet
  * 
- * Code optimization: The old writeVideosToSpreadsheet function uses a loop to append each video row to the spreadsheet.
+ * Code optimization: The old writeVideoInfoToSpreadsheet function uses a loop to append each video row to the spreadsheet.
  * However, this can be slow when dealing with a large number of rows.
  * A better approach is to write the video data to a 2D array and then use the setValues method to write the entire array to the sheet at once.
  * This can significantly improve performance.
  * 
  */
-function writeVideosToSpreadsheet(sheet, videos) {
+function writeVideoInfoToSpreadsheet(sheet, videos) {
 
   // Write header
   writeHeader(sheet);
@@ -116,10 +142,14 @@ function writeVideosToSpreadsheet(sheet, videos) {
   // Loop through the videos and add earch video row to the 2D array
   videos.forEach(video => {
     const videoRow = [
-      video.snippet.channelTitle,
-      video.snippet.publishedAt,
-      '=HYPERLINK("https://www.youtube.com/watch?v=' + video.id.videoId + '", "' + video.snippet.title + '")',
-      video.snippet.description,
+      video.id.videoId,
+      video.info.snippet.channelTitle,
+      formatDateInUserTimeZone(video.info.snippet.publishedAt), // Changed to format according to the user's time zone.
+      '=HYPERLINK("https://www.youtube.com/watch?v=' + video.id.videoId + '", "' + video.info.snippet.title + '")',
+      video.info.snippet.description,
+      video.info.contentDetails.duration,
+      video.info.statistics.viewCount,
+      video.info.statistics.likeCount,
     ];
     data.push(videoRow);
   });
@@ -139,14 +169,21 @@ function main() {
 
   // Get hanndle ID
   const handleId = getHandleId(sheet);
+  if (!handleId) {
+    throw new Error("No Handle ID found. Please set handle ID to the sheet name.");
+  }
 
   // Get channel ID
   const channelId = getChannelId(handleId);
+  if (!channelId) {
+    throw new Error("Channel ID is not available. Please check handle ID.");
+  }
 
-  // Get videos
-  const videos = getAllVideos(channelId);
+  // Get all video info
+  const videos = getAllVideoInfo(channelId);
 
-  // Write videos to spreadsheet
-  writeVideosToSpreadsheet(sheet, videos);
+  // Write the all video info to spreadsheet
+  writeVideoInfoToSpreadsheet(sheet, videos);
+
 }
 
