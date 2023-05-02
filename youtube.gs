@@ -15,6 +15,20 @@ function formatDateInUserTimeZone(timestamp) {
 }
 
 /*
+ * Format Duration
+ * 
+ * e.g.) PT4MS5S -> 4:05
+ */
+function formatDuration(duration) {
+  const match = duration.match(/PT(\d+M)?(\d+S)?/);
+  const minutes = parseInt(match[1]) || 0;
+  const seconds = parseInt(match[2]) || 0;
+  const totalSeconds = minutes * 60 + seconds;
+  return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`;
+}
+
+
+/*
  * Trigger runs automatically when a user opens a spreadsheet.
  */
 function onOpen() {
@@ -147,7 +161,7 @@ function writeVideoInfoToSpreadsheet(sheet, videos) {
       formatDateInUserTimeZone(video.info.snippet.publishedAt), // Changed to format according to the user's time zone.
       '=HYPERLINK("https://www.youtube.com/watch?v=' + video.id.videoId + '", "' + video.info.snippet.title + '")',
       video.info.snippet.description,
-      video.info.contentDetails.duration,
+      formatDuration(video.info.contentDetails.duration), 
       video.info.statistics.viewCount,
       video.info.statistics.likeCount,
     ];
