@@ -77,8 +77,15 @@ function getAllVideoInfo (channelId) {
       const video = searchResponse.items[cnt];
       const videoInfo = videoResponse.items[cnt];
       videos.push({
-        id: video.id,
-        info: videoInfo,
+        videoId: video.id.videoId,
+        channelId: channelId,
+        channelTitle: videoInfo.snippet.channelTitle,
+        publishedAt: videoInfo.snippet.publishedAt,
+        title: videoInfo.snippet.title,
+        description: videoInfo.snippet.description,
+        duration: videoInfo.contentDetails.duration,
+        viewCount: videoInfo.statistics.viewCount,
+        likeCount: videoInfo.statistics.likeCount,
       });
     }
 
@@ -156,14 +163,15 @@ function writeVideoInfoToSpreadsheet(sheet, videos) {
   // Loop through the videos and add earch video row to the 2D array
   videos.forEach(video => {
     const videoRow = [
-      video.id.videoId,
-      video.info.snippet.channelTitle,
-      formatDateInUserTimeZone(video.info.snippet.publishedAt), // Changed to format according to the user's time zone.
-      '=HYPERLINK("https://www.youtube.com/watch?v=' + video.id.videoId + '", "' + video.info.snippet.title + '")',
-      video.info.snippet.description,
-      formatDuration(video.info.contentDetails.duration), 
-      video.info.statistics.viewCount,
-      video.info.statistics.likeCount,
+      video.videoId,
+      video.channelId,
+      video.channelTitle,
+      formatDateInUserTimeZone(video.publishedAt), // Changed to format according to the user's time zone.
+      '=HYPERLINK("https://www.youtube.com/watch?v=' + video.videoId + '", "' + video.title + '")',
+      video.description,
+      formatDuration(video.duration), 
+      video.viewCount,
+      video.likeCount,
     ];
     data.push(videoRow);
   });
