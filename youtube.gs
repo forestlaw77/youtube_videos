@@ -20,11 +20,11 @@ function formatDateInUserTimeZone(timestamp) {
  * e.g.) PT4MS5S -> 4:05
  */
 function formatDuration(duration) {
-  const match = duration.match(/PT(\d+M)?(\d+S)?/);
-  const minutes = parseInt(match[1]) || 0;
-  const seconds = parseInt(match[2]) || 0;
-  const totalSeconds = minutes * 60 + seconds;
-  return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`;
+  const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+  const hours = (parseInt(match[1]) || 0);
+  const minutes = (parseInt(match[2]) || 0);
+  const seconds = (parseInt(match[3]) || 0);
+  return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
 
@@ -47,35 +47,28 @@ function getAllVideoInfo (channelId) {
   let nextPageToken = "";
 
   do {
-    let searchResponse = [];
-    let videoResponse = [];
+    let searchResult = {};
+    let videoResult = {};
     
     try {
-      searchResponse = YouTube.Search.list("id", {
+      searchResult = YouTube.Search.list("id", {
         channelId: channelId,
         type: "video",
         maxResults: 50,
         pageToken: nextPageToken,
       });
-    } catch (error) {
-      console.error("Error fetching video: ", error);
-      continue;
-    }
-
-    const videoIds = searchResponse.items.map(item => item.id.videoId).join(",");
-
-    try {
-      videoResponse = YouTube.Videos.list("snippet, contentDetails, statistics", {
+      const videoIds = searchResult.items.map(item => item.id.videoId).join(",");
+      videoResult = YouTube.Videos.list("snippet, contentDetails, statistics", {
         id: videoIds,
       });
     } catch (error) {
-      console.error("Error fetching video Info: ", error);
+      console.error("Error fetching video or video Info: ", error);
       continue;
     }
 
-    for (let cnt = 0; cnt < searchResponse.items.length; cnt++) {
-      const video = searchResponse.items[cnt];
-      const videoInfo = videoResponse.items[cnt];
+    for (let videoIndex = 0; videoIndex < searchResult.items.length; videoIndex++) {
+      const video = searchResult.items[videoIndex];
+      const videoInfo = videoResult.items[videoIndex];
       videos.push({
         videoId: video.id.videoId,
         channelId: channelId,
@@ -89,7 +82,7 @@ function getAllVideoInfo (channelId) {
       });
     }
 
-    nextPageToken = searchResponse.nextPageToken;
+    nextPageToken = searchResult.nextPageToken;
   } while (nextPageToken);
 
   return videos;
